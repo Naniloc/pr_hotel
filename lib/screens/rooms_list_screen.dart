@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/breakpoints.dart';
 import '../core/formatting.dart';
 import '../models/room.dart';
+import '../models/room_type.dart';
 import '../models/room_query.dart';
+import '../repositories/room_type_repository.dart';
 import '../state/room_list_notifier.dart';
 import '../widgets/entity_card.dart';
 import '../widgets/entity_table.dart';
@@ -20,7 +23,7 @@ class RoomsListScreen extends StatefulWidget {
 
 class _RoomsListScreenState extends State<RoomsListScreen> {
   final _searchController = TextEditingController();
-  String? _selectedType;
+  int? _selectedType;
   int? _selectedFloor;
   int? _minPrice;
   int? _maxPrice;
@@ -55,7 +58,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
     final notifier = context.read<RoomListNotifier>();
     notifier.applyQuery(
       notifier.query.copyWith(
-        type: _selectedType,
+        roomTypeId: _selectedType,
         floor: _selectedFloor,
         priceMin: _minPrice,
         priceMax: _maxPrice,
@@ -73,9 +76,14 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
     notifier.applyQuery(const RoomQuery());
   }
 
+  List<RoomType> _getRoomTypes(BuildContext context) {
+    return context.read<RoomTypeRepository>().getAll();
+  }
+
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<RoomListNotifier>();
+    final roomTypes = _getRoomTypes(context);
     final size = layoutSizeOf(context);
     final isMobile = size == LayoutSize.compact;
 
@@ -83,6 +91,11 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
       appBar: AppBar(
         title: const Text('Номера'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => context.go('/rooms/new'),
+            tooltip: 'Добавить номер',
+          ),
           if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -101,7 +114,6 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
       ),
       body: Column(
         children: [
-          // Фильтры
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -125,26 +137,19 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 120,
-                        child: DropdownButton<String>(
+                        width: 150,
+                        child: DropdownButton<int>(
                           isExpanded: true,
                           value: _selectedType,
                           hint: const Text('Тип'),
-                          items:
-                              [
-                                    'standard',
-                                    'twin',
-                                    'suite',
-                                    'family',
-                                    'apartment',
-                                  ]
-                                  .map(
-                                    (type) => DropdownMenuItem(
-                                      value: type,
-                                      child: Text(type),
-                                    ),
-                                  )
-                                  .toList(),
+                          items: roomTypes
+                              .map(
+                                (rt) => DropdownMenuItem(
+                                  value: rt.id,
+                                  child: Text(rt.name),
+                                ),
+                              )
+                              .toList(),
                           onChanged: (value) =>
                               setState(() => _selectedType = value),
                         ),
@@ -186,14 +191,17 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
               ],
             ),
           ),
-          // Контент
-          Expanded(child: _buildContent(notifier, isMobile)),
+          Expanded(child: _buildContent(notifier, roomTypes, isMobile)),
         ],
       ),
     );
   }
 
-  Widget _buildContent(RoomListNotifier notifier, bool isMobile) {
+  Widget _buildContent(
+    RoomListNotifier notifier,
+    List<RoomType> roomTypes,
+    bool isMobile,
+  ) {
     switch (notifier.status) {
       case LoadStatus.loading:
         return const Center(child: CircularProgressIndicator());
@@ -238,15 +246,26 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                       itemCount: notifier.result.items.length,
                       itemBuilder: (context, index) {
                         final room = notifier.result.items[index];
+                        final roomType = roomTypes
+                            .firstWhere(
+                              (rt) => rt.id == room.roomTypeId,
+                              orElse: () => const RoomType(
+                                id: 0,
+                                name: 'Неизвестно',
+                                description: '',
+                              ),
+                            )
+                            .name;
                         return EntityCard<Room>(
                           item: room,
                           title: (r) => 'Номер ${r.number}',
                           subtitle: (r) =>
-                              '${r.type} • ${r.capacity} мест • ${formatMoney(r.pricePerNight)}',
+                              '$roomType • Этаж ${r.floorId} • ${r.capacity} мест • ${formatMoney(r.pricePerNight)}',
                           actions: (r) => [
                             IconButton(
                               icon: const Icon(Icons.edit),
-                              onPressed: () {},
+                              onPressed: () =>
+                                  context.go('/rooms/${r.id}/edit'),
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete),
@@ -271,13 +290,25 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                           ),
                           TableColumnSpec(
                             label: 'Тип',
-                            build: (r) => Text(r.type),
+                            build: (r) {
+                              final roomType = roomTypes
+                                  .firstWhere(
+                                    (rt) => rt.id == r.roomTypeId,
+                                    orElse: () => const RoomType(
+                                      id: 0,
+                                      name: 'Неизвестно',
+                                      description: '',
+                                    ),
+                                  )
+                                  .name;
+                              return Text(roomType);
+                            },
                           ),
                           TableColumnSpec(
                             label: 'Этаж',
                             sortField: 'floor',
                             numeric: true,
-                            build: (r) => Text('${r.floor}'),
+                            build: (r) => Text('${r.floorId}'),
                           ),
                           TableColumnSpec(
                             label: 'Мест',
@@ -318,7 +349,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                         actions: (r) => [
                           IconButton(
                             icon: const Icon(Icons.edit),
-                            onPressed: () {},
+                            onPressed: () => context.go('/rooms/${r.id}/edit'),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete),

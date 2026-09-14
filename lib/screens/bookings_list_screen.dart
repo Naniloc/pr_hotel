@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/breakpoints.dart';
 import '../core/formatting.dart';
@@ -70,6 +71,11 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
       appBar: AppBar(
         title: const Text('Бронирования'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => context.go('/bookings/new'),
+            tooltip: 'Добавить бронирование',
+          ),
           if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -88,7 +94,6 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
       ),
       body: Column(
         children: [
-          // Фильтры
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -148,7 +153,6 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
               ],
             ),
           ),
-          // Контент
           Expanded(child: _buildContent(notifier, isMobile)),
         ],
       ),
@@ -206,16 +210,37 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
                           subtitle: (b) =>
                               '${formatShortDate(b.checkIn)} - ${formatShortDate(b.checkOut)} (${b.nights} ночей)',
                           actions: (b) => [
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () {},
+                            InkWell(
+                              onTap: () => context.go('/bookings/${b.id}/edit'),
+                              child: const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit),
+                                    SizedBox(width: 8),
+                                    Text('Редактировать'),
+                                  ],
+                                ),
+                              ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _showDeleteConfirmation(
+                            InkWell(
+                              onTap: () => _showDeleteConfirmation(
                                 context,
                                 notifier,
                                 bookingId: b.id,
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Удалить',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -276,7 +301,8 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
                         actions: (b) => [
                           IconButton(
                             icon: const Icon(Icons.edit),
-                            onPressed: () {},
+                            onPressed: () =>
+                                context.go('/bookings/${b.id}/edit'),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete),

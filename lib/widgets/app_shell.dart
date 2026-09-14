@@ -38,10 +38,14 @@ class AppShell extends StatelessWidget {
                 icon: Icon(Icons.calendar_today),
                 label: Text('Бронирования'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.people),
+                label: Text('Гости'),
+              ),
             ],
             selectedIndex: _getSelectedIndex(context),
             onDestinationSelected: (index) {
-              final routes = ['/', '/rooms', '/bookings'];
+              final routes = ['/', '/rooms', '/bookings', '/guests'];
               context.go(routes[index]);
             },
           ),
@@ -94,6 +98,14 @@ class AppShell extends StatelessWidget {
               Navigator.pop(context);
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.people),
+            title: const Text('Гости'),
+            onTap: () {
+              context.go('/guests');
+              Navigator.pop(context);
+            },
+          ),
         ],
       ),
     );
@@ -104,6 +116,7 @@ class AppShell extends StatelessWidget {
     if (location == '/') return 0;
     if (location.startsWith('/rooms')) return 1;
     if (location.startsWith('/bookings')) return 2;
+    if (location.startsWith('/guests')) return 3;
     return 0;
   }
 }

@@ -1,6 +1,6 @@
 class RoomQuery {
   final String search;
-  final String? type;
+  final int? roomTypeId;
   final int? floor;
   final int? priceMin;
   final int? priceMax;
@@ -14,7 +14,7 @@ class RoomQuery {
 
   const RoomQuery({
     this.search = '',
-    this.type,
+    this.roomTypeId,
     this.floor,
     this.priceMin,
     this.priceMax,
@@ -29,7 +29,7 @@ class RoomQuery {
 
   RoomQuery copyWith({
     String? search,
-    Object? type = _unset,
+    Object? roomTypeId = _unset,
     Object? floor = _unset,
     Object? priceMin = _unset,
     Object? priceMax = _unset,
@@ -43,7 +43,7 @@ class RoomQuery {
   }) {
     return RoomQuery(
       search: search ?? this.search,
-      type: type == _unset ? this.type : type as String?,
+      roomTypeId: roomTypeId == _unset ? this.roomTypeId : roomTypeId as int?,
       floor: floor == _unset ? this.floor : floor as int?,
       priceMin: priceMin == _unset ? this.priceMin : priceMin as int?,
       priceMax: priceMax == _unset ? this.priceMax : priceMax as int?,

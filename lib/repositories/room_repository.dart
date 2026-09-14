@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/room.dart';
 import '../models/room_query.dart';
 import '../models/page_result.dart';
@@ -11,178 +14,220 @@ abstract interface class RoomRepository {
   Future<void> hardDelete(int id);
   Future<void> restore(int id);
   Future<int> deleteMany(List<int> ids);
+  bool isRoomNumberUnique(String number, {int? excludeId});
 }
 
-// Демо-данные
 const List<Room> _seedRooms = [
   Room(
     id: 1,
     number: '101',
-    type: 'standard',
-    floor: 1,
+    floorId: 1,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
   Room(
     id: 2,
     number: '102',
-    type: 'standard',
-    floor: 1,
+    floorId: 1,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
   Room(
     id: 3,
     number: '103',
-    type: 'twin',
-    floor: 1,
+    floorId: 1,
+    roomTypeId: 2,
     capacity: 2,
     pricePerNight: 4000,
   ),
   Room(
     id: 4,
     number: '104',
-    type: 'twin',
-    floor: 1,
+    floorId: 1,
+    roomTypeId: 2,
     capacity: 3,
     pricePerNight: 4500,
   ),
   Room(
     id: 5,
     number: '105',
-    type: 'standard',
-    floor: 1,
+    floorId: 1,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
-
   Room(
     id: 6,
     number: '201',
-    type: 'standard',
-    floor: 2,
+    floorId: 2,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
   Room(
     id: 7,
     number: '202',
-    type: 'suite',
-    floor: 2,
+    floorId: 2,
+    roomTypeId: 3,
     capacity: 4,
     pricePerNight: 6500,
   ),
   Room(
     id: 8,
     number: '203',
-    type: 'standard',
-    floor: 2,
+    floorId: 2,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
   Room(
     id: 9,
     number: '204',
-    type: 'twin',
-    floor: 2,
+    floorId: 2,
+    roomTypeId: 2,
     capacity: 2,
     pricePerNight: 4000,
   ),
   Room(
     id: 10,
     number: '205',
-    type: 'family',
-    floor: 2,
+    floorId: 2,
+    roomTypeId: 4,
     capacity: 4,
     pricePerNight: 7000,
   ),
-
   Room(
     id: 11,
     number: '301',
-    type: 'family',
-    floor: 3,
+    floorId: 3,
+    roomTypeId: 4,
     capacity: 4,
     pricePerNight: 7000,
   ),
   Room(
     id: 12,
     number: '302',
-    type: 'standard',
-    floor: 3,
+    floorId: 3,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
   Room(
     id: 13,
     number: '303',
-    type: 'suite',
-    floor: 3,
+    floorId: 3,
+    roomTypeId: 3,
     capacity: 4,
     pricePerNight: 6500,
   ),
   Room(
     id: 14,
     number: '304',
-    type: 'twin',
-    floor: 3,
+    floorId: 3,
+    roomTypeId: 2,
     capacity: 3,
     pricePerNight: 4500,
   ),
   Room(
     id: 15,
     number: '305',
-    type: 'standard',
-    floor: 3,
+    floorId: 3,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
-
   Room(
     id: 16,
     number: '401',
-    type: 'family',
-    floor: 4,
+    floorId: 4,
+    roomTypeId: 4,
     capacity: 4,
     pricePerNight: 7000,
   ),
   Room(
     id: 17,
     number: '402',
-    type: 'suite',
-    floor: 4,
+    floorId: 4,
+    roomTypeId: 3,
     capacity: 4,
     pricePerNight: 6500,
   ),
   Room(
     id: 18,
     number: '403',
-    type: 'apartment',
-    floor: 4,
+    floorId: 4,
+    roomTypeId: 5,
     capacity: 6,
     pricePerNight: 9000,
   ),
   Room(
     id: 19,
     number: '404',
-    type: 'twin',
-    floor: 4,
+    floorId: 4,
+    roomTypeId: 2,
     capacity: 3,
     pricePerNight: 4500,
   ),
   Room(
     id: 20,
     number: '405',
-    type: 'standard',
-    floor: 4,
+    floorId: 4,
+    roomTypeId: 1,
     capacity: 2,
     pricePerNight: 3500,
   ),
 ];
 
 class InMemoryRoomRepository implements RoomRepository {
-  final List<Room> _rooms = List.from(_seedRooms);
-  int _nextId = _seedRooms.length + 1;
+  static const _key = 'rooms_v1';
+  final SharedPreferences? _prefs;
+
+  final List<Room> _rooms = [];
+  int _nextId = 21;
+
+  InMemoryRoomRepository([this._prefs]) {
+    _restore();
+  }
+
+  void _restore() {
+    if (_prefs == null) {
+      _rooms.addAll(_seedRooms);
+      return;
+    }
+
+    final raw = _prefs.getString(_key);
+    if (raw == null) {
+      _rooms.addAll(_seedRooms);
+      _persist();
+      return;
+    }
+
+    try {
+      final list = jsonDecode(raw) as List;
+      _rooms.addAll(
+        list.map((e) => Room.fromJson(e as Map<String, dynamic>)).toList(),
+      );
+
+      if (_rooms.isNotEmpty) {
+        _nextId = _rooms.map((r) => r.id).reduce((a, b) => a > b ? a : b) + 1;
+      }
+    } catch (e) {
+      _rooms.addAll(_seedRooms);
+      _persist();
+    }
+  }
+
+  Future<void> _persist() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    await prefs.setString(
+      _key,
+      jsonEncode(_rooms.map((r) => r.toJson()).toList()),
+    );
+  }
 
   @override
   Future<PageResult<Room>> find(RoomQuery q) async {
@@ -197,12 +242,12 @@ class InMemoryRoomRepository implements RoomRepository {
           .toList();
     }
 
-    if (q.type != null) {
-      rows = rows.where((r) => r.type == q.type).toList();
+    if (q.roomTypeId != null) {
+      rows = rows.where((r) => r.roomTypeId == q.roomTypeId).toList();
     }
 
     if (q.floor != null) {
-      rows = rows.where((r) => r.floor == q.floor).toList();
+      rows = rows.where((r) => r.floorId == q.floor).toList();
     }
 
     if (q.priceMin != null) {
@@ -223,7 +268,7 @@ class InMemoryRoomRepository implements RoomRepository {
 
     rows.sort((a, b) {
       final result = switch (q.sortField) {
-        'floor' => a.floor.compareTo(b.floor),
+        'floor' => a.floorId.compareTo(b.floorId),
         'capacity' => a.capacity.compareTo(b.capacity),
         'price' => a.pricePerNight.compareTo(b.pricePerNight),
         _ => a.number.compareTo(b.number),
@@ -253,12 +298,14 @@ class InMemoryRoomRepository implements RoomRepository {
     final newRoom = Room(
       id: _nextId++,
       number: room.number,
-      type: room.type,
-      floor: room.floor,
+      floorId: room.floorId,
+      roomTypeId: room.roomTypeId,
       capacity: room.capacity,
       pricePerNight: room.pricePerNight,
+      isAvailable: room.isAvailable,
     );
     _rooms.add(newRoom);
+    await _persist();
     return newRoom;
   }
 
@@ -267,6 +314,7 @@ class InMemoryRoomRepository implements RoomRepository {
     final i = _rooms.indexWhere((r) => r.id == room.id);
     if (i == -1) throw StateError('Номер ${room.id} не найден');
     _rooms[i] = room;
+    await _persist();
     return room;
   }
 
@@ -275,11 +323,13 @@ class InMemoryRoomRepository implements RoomRepository {
     final i = _rooms.indexWhere((r) => r.id == id);
     if (i == -1) throw StateError('Номер $id не найден');
     _rooms[i] = _rooms[i].copyWith(deletedAt: DateTime.now());
+    await _persist();
   }
 
   @override
   Future<void> hardDelete(int id) async {
     _rooms.removeWhere((r) => r.id == id);
+    await _persist();
   }
 
   @override
@@ -287,6 +337,7 @@ class InMemoryRoomRepository implements RoomRepository {
     final i = _rooms.indexWhere((r) => r.id == id);
     if (i == -1) throw StateError('Номер $id не найден');
     _rooms[i] = _rooms[i].copyWith(clearDeletedAt: true);
+    await _persist();
   }
 
   @override
@@ -299,6 +350,17 @@ class InMemoryRoomRepository implements RoomRepository {
         count++;
       }
     }
+    await _persist();
     return count;
+  }
+
+  @override
+  bool isRoomNumberUnique(String number, {int? excludeId}) {
+    return !_rooms.any(
+      (r) =>
+          r.number.toLowerCase() == number.toLowerCase() &&
+          r.id != excludeId &&
+          !r.isDeleted,
+    );
   }
 }
