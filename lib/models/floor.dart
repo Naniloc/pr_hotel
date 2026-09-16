@@ -1,5 +1,5 @@
 class Floor {
-  final int id;
+  final String id;
   final int number;
   final int roomCount;
   final DateTime? deletedAt;
@@ -37,7 +37,7 @@ class Floor {
   };
 
   factory Floor.fromJson(Map<String, dynamic> json) => Floor(
-    id: json['id'] as int? ?? 0,
+    id: json['id'] as String? ?? '', // ← String
     number: json['number'] as int? ?? 0,
     roomCount: json['roomCount'] as int? ?? 0,
     deletedAt: json['deletedAt'] == null

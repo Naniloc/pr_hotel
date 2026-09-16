@@ -5,15 +5,18 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/booking.dart';
+import '../models/room.dart';
+import '../models/guest.dart';
 import '../models/room_query.dart';
 import '../repositories/booking_repository.dart';
 import '../repositories/room_repository.dart';
 import '../repositories/guest_repository.dart';
+import '../repositories/pocketbase_guest_repository.dart';
 import '../core/formatting.dart';
 import '../state/booking_list_notifier.dart';
 
 class BookingFormScreen extends StatefulWidget {
-  final int? id;
+  final String? id;
 
   const BookingFormScreen({super.key, this.id});
 
@@ -26,17 +29,21 @@ class BookingFormScreen extends StatefulWidget {
 class _BookingFormScreenState extends State<BookingFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  int? _roomId;
-  int? _guestId;
+  String? _roomId;
+  String? _guestId;
   DateTime? _checkIn;
   DateTime? _checkOut;
   String _status = 'confirmed';
 
   bool _isLoading = false;
+  List<Room> _rooms = [];
+  List<Guest> _guests = [];
 
   @override
   void initState() {
     super.initState();
+
+    _loadData();
 
     if (widget.isEditing) {
       _loadBooking();
@@ -46,25 +53,64 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     }
   }
 
+  Future<void> _loadData() async {
+    final roomRepo = context.read<RoomRepository>();
+    final guestRepo =
+        context.read<GuestRepository>() as PocketBaseGuestRepository;
+
+    try {
+      final roomsResult = await roomRepo.find(const RoomQuery(size: 200));
+      final guests = await guestRepo.getAllAsync();
+
+      if (mounted) {
+        setState(() {
+          _rooms = roomsResult.items;
+          _guests = guests;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки данных: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _loadBooking() async {
     setState(() => _isLoading = true);
 
-    final repo = context.read<BookingRepository>();
-    final booking = await repo.findById(widget.id!);
+    try {
+      final repo = context.read<BookingRepository>();
+      final booking = await repo.findById(widget.id!);
 
-    if (booking != null && mounted) {
-      setState(() {
-        _roomId = booking.roomId;
-        _guestId = booking.guestId;
-        _checkIn = booking.checkIn;
-        _checkOut = booking.checkOut;
-        _status = booking.status;
-        _isLoading = false;
-      });
-    } else {
+      if (booking != null && mounted) {
+        setState(() {
+          _roomId = booking.roomId;
+          _guestId = booking.guestId;
+          _checkIn = booking.checkIn;
+          _checkOut = booking.checkOut;
+          _status = booking.status;
+          _isLoading = false;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Бронирование не найдено')),
+          );
+          context.go('/bookings');
+        }
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Бронирование не найдено')),
+          SnackBar(
+            content: Text('Ошибка загрузки: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
         context.go('/bookings');
       }
@@ -95,31 +141,34 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       return;
     }
 
-    final repo = context.read<BookingRepository>();
-    final guestRepo = context.read<GuestRepository>();
-
-    final guest = guestRepo.getById(_guestId!);
-    if (guest == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Гость не найден'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final booking = Booking(
-      id: widget.id ?? 0,
-      roomId: _roomId!,
-      guestId: _guestId!,
-      guestName: guest.name,
-      checkIn: _checkIn!,
-      checkOut: _checkOut!,
-      status: _status,
-    );
-
     try {
+      final repo = context.read<BookingRepository>();
+      final guestRepo =
+          context.read<GuestRepository>() as PocketBaseGuestRepository;
+
+      final guest = await guestRepo.getByIdAsync(_guestId!);
+      if (guest == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Гость не найден'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final booking = Booking(
+        id: widget.id ?? '',
+        roomId: _roomId!,
+        guestId: _guestId!,
+        guestName: guest.name,
+        checkIn: _checkIn!,
+        checkOut: _checkOut!,
+        status: _status,
+      );
+
       if (widget.isEditing) {
         await repo.update(booking);
       } else {
@@ -189,9 +238,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       );
     }
 
-    final roomRepo = context.read<RoomRepository>();
-    final guestRepo = context.read<GuestRepository>();
-
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -205,46 +251,34 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            FutureBuilder(
-              future: roomRepo.find(const RoomQuery()),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const CircularProgressIndicator();
-                }
-
-                final rooms = snapshot.data!.items;
-
-                return DropdownButtonFormField<int>(
-                  value: _roomId,
-                  decoration: const InputDecoration(
-                    labelText: 'Номер',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: rooms
-                      .map(
-                        (r) => DropdownMenuItem(
-                          value: r.id,
-                          child: Text(
-                            'Номер ${r.number} (${formatMoney(r.pricePerNight)}/ночь)',
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) => setState(() => _roomId = value),
-                  validator: (value) => value == null ? 'Выберите номер' : null,
-                );
-              },
+            DropdownButtonFormField<String>(
+              value: _roomId,
+              decoration: const InputDecoration(
+                labelText: 'Номер',
+                border: OutlineInputBorder(),
+              ),
+              items: _rooms
+                  .map(
+                    (r) => DropdownMenuItem(
+                      value: r.id,
+                      child: Text(
+                        'Номер ${r.number} (${formatMoney(r.pricePerNight)}/ночь)',
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _roomId = value),
+              validator: (value) => value == null ? 'Выберите номер' : null,
             ),
             const SizedBox(height: 16),
 
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<String>(
               value: _guestId,
               decoration: const InputDecoration(
                 labelText: 'Гость',
                 border: OutlineInputBorder(),
               ),
-              items: guestRepo
-                  .getAll()
+              items: _guests
                   .map(
                     (g) => DropdownMenuItem(
                       value: g.id,
@@ -339,7 +373,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
             ),
             const SizedBox(height: 32),
 
-            // Кнопки
             Row(
               children: [
                 Expanded(

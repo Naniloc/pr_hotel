@@ -5,16 +5,55 @@ import 'package:go_router/go_router.dart';
 import '../core/breakpoints.dart';
 import '../models/guest.dart';
 import '../repositories/guest_repository.dart';
+import '../repositories/pocketbase_guest_repository.dart';
 import '../widgets/entity_card.dart';
 import '../widgets/entity_table.dart';
 
-class GuestsListScreen extends StatelessWidget {
+class GuestsListScreen extends StatefulWidget {
   const GuestsListScreen({super.key});
 
   @override
+  State<GuestsListScreen> createState() => _GuestsListScreenState();
+}
+
+class _GuestsListScreenState extends State<GuestsListScreen> {
+  List<Guest> _guests = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGuests();
+  }
+
+  Future<void> _loadGuests() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final repo = context.read<GuestRepository>() as PocketBaseGuestRepository;
+      final guests = await repo.getAllAsync();
+      if (mounted) {
+        setState(() {
+          _guests = guests;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final repo = context.watch<GuestRepository>();
-    final guests = repo.getAll();
     final size = layoutSizeOf(context);
     final isMobile = size == LayoutSize.compact;
 
@@ -27,9 +66,32 @@ class GuestsListScreen extends StatelessWidget {
             onPressed: () => context.go('/guests/new'),
             tooltip: 'Добавить гостя',
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadGuests,
+            tooltip: 'Обновить',
+          ),
         ],
       ),
-      body: guests.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Ошибка: $_error'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadGuests,
+                    child: const Text('Повторить'),
+                  ),
+                ],
+              ),
+            )
+          : _guests.isEmpty
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -43,9 +105,9 @@ class GuestsListScreen extends StatelessWidget {
           : isMobile
           ? ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: guests.length,
+              itemCount: _guests.length,
               itemBuilder: (context, index) {
-                final guest = guests[index];
+                final guest = _guests[index];
                 return EntityCard<Guest>(
                   item: guest,
                   title: (g) => g.name,
@@ -57,8 +119,7 @@ class GuestsListScreen extends StatelessWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete),
-                      onPressed: () =>
-                          _showDeleteConfirmation(context, repo, g.id),
+                      onPressed: () => _showDeleteConfirmation(g.id),
                     ),
                   ],
                 );
@@ -75,7 +136,7 @@ class GuestsListScreen extends StatelessWidget {
                     build: (g) => Text(g.phone),
                   ),
                 ],
-                items: guests,
+                items: _guests,
                 idOf: (g) => g.id,
                 actions: (g) => [
                   IconButton(
@@ -84,8 +145,7 @@ class GuestsListScreen extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete),
-                    onPressed: () =>
-                        _showDeleteConfirmation(context, repo, g.id),
+                    onPressed: () => _showDeleteConfirmation(g.id),
                   ),
                 ],
               ),
@@ -93,30 +153,46 @@ class GuestsListScreen extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(
-    BuildContext context,
-    GuestRepository repo,
-    int id,
-  ) {
-    showDialog(
+  Future<void> _showDeleteConfirmation(String id) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Удалить?'),
         content: const Text('Вы уверены?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Отмена'),
           ),
           FilledButton(
-            onPressed: () {
-              repo.delete(id);
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Удалить'),
           ),
         ],
       ),
     );
+
+    if (confirmed == true && mounted) {
+      try {
+        final repo =
+            context.read<GuestRepository>() as PocketBaseGuestRepository;
+        await repo.deleteAsync(id);
+        _loadGuests();
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Гость удалён')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ошибка удаления: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }

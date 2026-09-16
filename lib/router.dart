@@ -33,7 +33,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/rooms/:id/edit',
           builder: (context, state) {
-            final id = int.tryParse(state.pathParameters['id'] ?? '');
+            final id = state.pathParameters['id']; // ← String?
             return RoomFormScreen(id: id);
           },
         ),
@@ -49,7 +49,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/bookings/:id/edit',
           builder: (context, state) {
-            final id = int.tryParse(state.pathParameters['id'] ?? '');
+            final id = state.pathParameters['id']; // ← String?
             return BookingFormScreen(id: id);
           },
         ),
@@ -65,7 +65,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/guests/:id/edit',
           builder: (context, state) {
-            final id = int.tryParse(state.pathParameters['id'] ?? '');
+            final id = state.pathParameters['id']; // ← String?
             return GuestFormScreen(id: id);
           },
         ),
@@ -80,7 +80,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/floors/:id/edit',
           builder: (context, state) {
-            final id = int.tryParse(state.pathParameters['id'] ?? '');
+            final id = state.pathParameters['id']; // ← String?
             return FloorFormScreen(id: id);
           },
         ),
@@ -96,7 +96,7 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/room-types/:id/edit',
           builder: (context, state) {
-            final id = int.tryParse(state.pathParameters['id'] ?? '');
+            final id = state.pathParameters['id']; // ← String?
             return RoomTypeFormScreen(id: id);
           },
         ),

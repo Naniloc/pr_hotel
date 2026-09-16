@@ -76,6 +76,11 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
             onPressed: () => context.go('/bookings/new'),
             tooltip: 'Добавить бронирование',
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => notifier.load(),
+            tooltip: 'Обновить',
+          ),
           if (notifier.hasSelection)
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -208,7 +213,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
                           item: booking,
                           title: (b) => b.guestName,
                           subtitle: (b) =>
-                              '${formatShortDate(b.checkIn)} - ${formatShortDate(b.checkOut)} (${b.nights} ночей)',
+                              'Номер ${b.room?.number ?? b.roomId} • ${formatShortDate(b.checkIn)} - ${formatShortDate(b.checkOut)} (${b.nights} ночей)',
                           actions: (b) => [
                             InkWell(
                               onTap: () => context.go('/bookings/${b.id}/edit'),
@@ -259,7 +264,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
                           TableColumnSpec(
                             label: 'Номер',
                             numeric: true,
-                            build: (b) => Text('${b.roomId}'),
+                            build: (b) => Text(b.room?.number ?? b.roomId),
                           ),
                           TableColumnSpec(
                             label: 'Заезд',
@@ -358,7 +363,7 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
   void _showDeleteConfirmation(
     BuildContext context,
     BookingListNotifier notifier, {
-    int? bookingId,
+    String? bookingId,
   }) {
     final count = bookingId != null ? 1 : notifier.selected.length;
     showDialog(
@@ -373,6 +378,9 @@ class _BookingsListScreenState extends State<BookingsListScreen> {
           ),
           FilledButton(
             onPressed: () {
+              if (bookingId != null) {
+                notifier.toggleSelection(bookingId);
+              }
               notifier.deleteSelected();
               Navigator.pop(context);
             },

@@ -9,6 +9,7 @@ import '../models/room.dart';
 import '../models/room_type.dart';
 import '../models/room_query.dart';
 import '../repositories/room_type_repository.dart';
+import '../repositories/pocketbase_room_type_repository.dart';
 import '../state/room_list_notifier.dart';
 import '../widgets/entity_card.dart';
 import '../widgets/entity_table.dart';
@@ -23,16 +24,28 @@ class RoomsListScreen extends StatefulWidget {
 
 class _RoomsListScreenState extends State<RoomsListScreen> {
   final _searchController = TextEditingController();
-  int? _selectedType;
+  String? _selectedType;
   int? _selectedFloor;
   int? _minPrice;
   int? _maxPrice;
   Timer? _debounce;
 
+  List<RoomType> _roomTypes = [];
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadRoomTypes();
+  }
+
+  Future<void> _loadRoomTypes() async {
+    final repo =
+        context.read<RoomTypeRepository>() as PocketBaseRoomTypeRepository;
+    final types = await repo.getAllAsync();
+    if (mounted) {
+      setState(() => _roomTypes = types);
+    }
   }
 
   @override
@@ -76,14 +89,9 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
     notifier.applyQuery(const RoomQuery());
   }
 
-  List<RoomType> _getRoomTypes(BuildContext context) {
-    return context.read<RoomTypeRepository>().getAll();
-  }
-
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<RoomListNotifier>();
-    final roomTypes = _getRoomTypes(context);
     final size = layoutSizeOf(context);
     final isMobile = size == LayoutSize.compact;
 
@@ -138,11 +146,11 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                     children: [
                       SizedBox(
                         width: 150,
-                        child: DropdownButton<int>(
+                        child: DropdownButton<String>(
                           isExpanded: true,
                           value: _selectedType,
                           hint: const Text('Тип'),
-                          items: roomTypes
+                          items: _roomTypes
                               .map(
                                 (rt) => DropdownMenuItem(
                                   value: rt.id,
@@ -191,17 +199,13 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
               ],
             ),
           ),
-          Expanded(child: _buildContent(notifier, roomTypes, isMobile)),
+          Expanded(child: _buildContent(notifier, isMobile)),
         ],
       ),
     );
   }
 
-  Widget _buildContent(
-    RoomListNotifier notifier,
-    List<RoomType> roomTypes,
-    bool isMobile,
-  ) {
+  Widget _buildContent(RoomListNotifier notifier, bool isMobile) {
     switch (notifier.status) {
       case LoadStatus.loading:
         return const Center(child: CircularProgressIndicator());
@@ -246,21 +250,11 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                       itemCount: notifier.result.items.length,
                       itemBuilder: (context, index) {
                         final room = notifier.result.items[index];
-                        final roomType = roomTypes
-                            .firstWhere(
-                              (rt) => rt.id == room.roomTypeId,
-                              orElse: () => const RoomType(
-                                id: 0,
-                                name: 'Неизвестно',
-                                description: '',
-                              ),
-                            )
-                            .name;
                         return EntityCard<Room>(
                           item: room,
                           title: (r) => 'Номер ${r.number}',
                           subtitle: (r) =>
-                              '$roomType • Этаж ${r.floorId} • ${r.capacity} мест • ${formatMoney(r.pricePerNight)}',
+                              '${r.roomType?.name ?? "Неизвестно"} • Этаж ${r.floor?.number ?? "?"} • ${r.capacity} мест • ${formatMoney(r.pricePerNight)}',
                           actions: (r) => [
                             IconButton(
                               icon: const Icon(Icons.edit),
@@ -290,25 +284,15 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
                           ),
                           TableColumnSpec(
                             label: 'Тип',
-                            build: (r) {
-                              final roomType = roomTypes
-                                  .firstWhere(
-                                    (rt) => rt.id == r.roomTypeId,
-                                    orElse: () => const RoomType(
-                                      id: 0,
-                                      name: 'Неизвестно',
-                                      description: '',
-                                    ),
-                                  )
-                                  .name;
-                              return Text(roomType);
-                            },
+                            build: (r) =>
+                                Text(r.roomType?.name ?? 'Неизвестно'),
                           ),
                           TableColumnSpec(
                             label: 'Этаж',
                             sortField: 'floor',
                             numeric: true,
-                            build: (r) => Text('${r.floorId}'),
+                            build: (r) =>
+                                Text(r.floor?.number.toString() ?? '?'),
                           ),
                           TableColumnSpec(
                             label: 'Мест',
@@ -385,7 +369,7 @@ class _RoomsListScreenState extends State<RoomsListScreen> {
   void _showDeleteConfirmation(
     BuildContext context,
     RoomListNotifier notifier, {
-    int? roomId,
+    String? roomId,
   }) {
     final count = roomId != null ? 1 : notifier.selected.length;
     showDialog(

@@ -16,7 +16,7 @@ class RoomListNotifier extends ChangeNotifier {
   PageResult<Room> _result = PageResult.empty();
   LoadStatus _status = LoadStatus.idle;
   String? _error;
-  final Set<int> _selected = {};
+  final Set<String> _selected = {};
 
   RoomQuery get query => _query;
 
@@ -26,7 +26,7 @@ class RoomListNotifier extends ChangeNotifier {
 
   String? get error => _error;
 
-  Set<int> get selected => Set.unmodifiable(_selected);
+  Set<String> get selected => Set.unmodifiable(_selected); // ← Set<String>
 
   bool get hasSelection => _selected.isNotEmpty;
 
@@ -51,7 +51,7 @@ class RoomListNotifier extends ChangeNotifier {
     await load();
   }
 
-  void toggleSelection(int id) {
+  void toggleSelection(String id) {
     _selected.contains(id) ? _selected.remove(id) : _selected.add(id);
     notifyListeners();
   }

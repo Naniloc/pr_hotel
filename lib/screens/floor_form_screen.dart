@@ -9,7 +9,7 @@ import '../repositories/floor_repository.dart';
 import '../core/validators.dart';
 
 class FloorFormScreen extends StatefulWidget {
-  final int? id;
+  final String? id;
 
   const FloorFormScreen({super.key, this.id});
 
@@ -66,7 +66,7 @@ class _FloorFormScreenState extends State<FloorFormScreen> {
     final repo = context.read<FloorRepository>();
 
     final floor = Floor(
-      id: widget.id ?? 0,
+      id: widget.id ?? '', // ← String
       number: int.parse(_numberController.text),
       roomCount: int.parse(_roomCountController.text),
     );

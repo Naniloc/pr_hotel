@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+// lib/screens/guest_form_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,10 +8,13 @@ import '../models/guest.dart';
 import '../models/guest_card.dart';
 import '../repositories/guest_repository.dart';
 import '../repositories/guest_card_repository.dart';
+import '../repositories/pocketbase_guest_repository.dart';
+import '../repositories/pocketbase_guest_card_repository.dart';
 import '../core/validators.dart';
+import '../core/api_exceptions.dart';
 
 class GuestFormScreen extends StatefulWidget {
-  final int? id;
+  final String? id;
 
   const GuestFormScreen({super.key, this.id});
 
@@ -33,8 +36,12 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
   DateTime? _passportIssuedDate;
 
   bool _hasCard = false;
-  int? _cardId;
+  String? _cardId;
   bool _isLoading = false;
+
+  Map<String, String> _serverErrors = {};
+  bool _checkingEmailUniqueness = false;
+  String? _emailUniquenessError;
 
   @override
   void initState() {
@@ -53,17 +60,29 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
   Future<void> _loadGuest() async {
     setState(() => _isLoading = true);
 
-    final guestRepo = context.read<GuestRepository>();
-    final cardRepo = context.read<GuestCardRepository>();
+    try {
+      final guestRepo =
+          context.read<GuestRepository>() as PocketBaseGuestRepository;
+      final cardRepo =
+          context.read<GuestCardRepository>() as PocketBaseGuestCardRepository;
 
-    final guest = guestRepo.getById(widget.id!);
+      final guest = await guestRepo.getByIdAsync(widget.id!);
 
-    if (guest != null && mounted) {
+      if (guest == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Гость не найден')));
+          context.go('/guests');
+        }
+        return;
+      }
+
       _nameController.text = guest.name;
       _emailController.text = guest.email;
       _phoneController.text = guest.phone;
 
-      final card = cardRepo.getByGuestId(guest.id);
+      final card = await cardRepo.getByGuestIdAsync(guest.id);
       if (card != null) {
         _cardId = card.id;
         _hasCard = true;
@@ -72,53 +91,85 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
         _passportIssuedDate = card.passportIssuedDate;
       }
 
-      setState(() => _isLoading = false);
-    } else {
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Гость не найден')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка загрузки: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
         context.go('/guests');
       }
     }
   }
 
   Future<void> _submit() async {
+    setState(() {
+      _serverErrors = {};
+      _emailUniquenessError = null;
+    });
+
     if (!_formKey.currentState!.validate()) return;
 
-    final guestRepo = context.read<GuestRepository>();
-    final cardRepo = context.read<GuestCardRepository>();
+    final guestRepo =
+        context.read<GuestRepository>() as PocketBaseGuestRepository;
+    final cardRepo =
+        context.read<GuestCardRepository>() as PocketBaseGuestCardRepository;
 
-    final emailUnique = guestRepo.isEmailUnique(
-      _emailController.text.trim(),
-      excludeId: widget.id,
-    );
+    final email = _emailController.text.trim();
 
-    if (!emailUnique) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email уже используется другим гостем'),
-          backgroundColor: Colors.red,
-        ),
+    setState(() => _checkingEmailUniqueness = true);
+
+    try {
+      final isUnique = await guestRepo.isEmailUniqueAsync(
+        email,
+        excludeId: widget.id,
       );
+
+      if (!isUnique) {
+        if (mounted) {
+          setState(() {
+            _emailUniquenessError = 'Email уже используется другим гостем';
+            _checkingEmailUniqueness = false;
+          });
+          _formKey.currentState!.validate();
+        }
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _checkingEmailUniqueness = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка проверки email: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
       return;
+    }
+
+    if (mounted) {
+      setState(() => _checkingEmailUniqueness = false);
     }
 
     try {
       final guest = Guest(
-        id: widget.id ?? 0,
+        id: widget.id ?? '',
         name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
+        email: email,
         phone: _phoneController.text.trim(),
       );
 
       final savedGuest = widget.isEditing
-          ? guestRepo.update(guest)
-          : guestRepo.create(guest);
+          ? await guestRepo.updateAsync(guest)
+          : await guestRepo.createAsync(guest);
 
       if (_hasCard && _passportIssuedDate != null) {
         final card = GuestCard(
-          id: _cardId ?? 0,
+          id: _cardId ?? '',
           guestId: savedGuest.id,
           passportNumber: _passportNumberController.text.trim(),
           passportIssuedBy: _passportIssuedByController.text.trim(),
@@ -126,9 +177,9 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
         );
 
         if (_cardId != null) {
-          cardRepo.update(card);
+          await cardRepo.updateAsync(card);
         } else {
-          cardRepo.create(card);
+          await cardRepo.createAsync(card);
         }
       }
 
@@ -136,14 +187,51 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.isEditing ? 'Гость обновлён' : 'Гость создан'),
+            backgroundColor: Colors.green,
           ),
         );
         context.go('/guests');
       }
+    } on ValidationException catch (e) {
+      if (mounted) {
+        setState(() => _serverErrors = e.errors);
+        _formKey.currentState!.validate();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка валидации: ${e.message}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } on ConflictException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } on NetworkException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Неизвестная ошибка: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -210,18 +298,49 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
             ),
             const SizedBox(height: 16),
 
+            // ← ОБНОВЛЁННОЕ ПОЛЕ EMAIL
             TextFormField(
               controller: _emailController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Email',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
                 helperText: 'Должен быть уникальным',
+                suffixIcon: _checkingEmailUniqueness
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
               ),
               keyboardType: TextInputType.emailAddress,
-              validator: Validators.combine([
-                (v) => Validators.required(v, 'Email'),
-                Validators.email,
-              ]),
+              onChanged: (_) {
+                setState(() {
+                  _emailUniquenessError = null;
+                  _serverErrors.remove('email');
+                });
+              },
+              validator: (value) {
+                final clientError = Validators.combine([
+                  (v) => Validators.required(v, 'Email'),
+                  Validators.email,
+                ])(value);
+
+                if (clientError != null) return clientError;
+
+                if (_emailUniquenessError != null) {
+                  return _emailUniquenessError;
+                }
+
+                if (_serverErrors.containsKey('email')) {
+                  return _serverErrors['email'];
+                }
+
+                return null;
+              },
             ),
             const SizedBox(height: 16),
 
@@ -233,10 +352,19 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
                 helperText: '+7 (XXX) XXX-XX-XX',
               ),
               keyboardType: TextInputType.phone,
-              validator: Validators.combine([
-                (v) => Validators.required(v, 'Телефон'),
-                Validators.phone,
-              ]),
+              validator: (value) {
+                final clientError = Validators.combine([
+                  (v) => Validators.required(v, 'Телефон'),
+                  Validators.phone,
+                ])(value);
+
+                if (clientError != null) return clientError;
+                if (_serverErrors.containsKey('phone')) {
+                  return _serverErrors['phone'];
+                }
+
+                return null;
+              },
             ),
             const SizedBox(height: 32),
 
@@ -325,8 +453,14 @@ class _GuestFormScreenState extends State<GuestFormScreen> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: FilledButton(
-                    onPressed: _submit,
-                    child: Text(widget.isEditing ? 'Сохранить' : 'Создать'),
+                    onPressed: _checkingEmailUniqueness ? null : _submit,
+                    child: _checkingEmailUniqueness
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(widget.isEditing ? 'Сохранить' : 'Создать'),
                   ),
                 ),
               ],

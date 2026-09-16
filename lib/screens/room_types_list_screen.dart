@@ -102,7 +102,7 @@ class RoomTypesListScreen extends StatelessWidget {
   void _showDeleteConfirmation(
     BuildContext context,
     RoomTypeRepository repo,
-    int id,
+    String id, // ← String
   ) {
     showDialog(
       context: context,

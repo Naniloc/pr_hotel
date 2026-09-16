@@ -9,7 +9,7 @@ import '../repositories/room_type_repository.dart';
 import '../core/validators.dart';
 
 class RoomTypeFormScreen extends StatefulWidget {
-  final int? id;
+  final String? id;
 
   const RoomTypeFormScreen({super.key, this.id});
 
@@ -66,7 +66,7 @@ class _RoomTypeFormScreenState extends State<RoomTypeFormScreen> {
     final repo = context.read<RoomTypeRepository>();
 
     final roomType = RoomType(
-      id: widget.id ?? 0,
+      id: widget.id ?? '',
       name: _nameController.text.trim(),
       description: _descriptionController.text.trim(),
     );
@@ -124,7 +124,6 @@ class _RoomTypeFormScreenState extends State<RoomTypeFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Название
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -140,7 +139,6 @@ class _RoomTypeFormScreenState extends State<RoomTypeFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Описание
             TextFormField(
               controller: _descriptionController,
               decoration: const InputDecoration(
@@ -156,7 +154,6 @@ class _RoomTypeFormScreenState extends State<RoomTypeFormScreen> {
             ),
             const SizedBox(height: 32),
 
-            // Кнопки
             Row(
               children: [
                 Expanded(

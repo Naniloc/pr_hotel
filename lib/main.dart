@@ -2,16 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
 
 import 'core/theme.dart';
 import 'core/scroll_behavior.dart';
+import 'core/api_client.dart';
 import 'repositories/room_repository.dart';
 import 'repositories/booking_repository.dart';
 import 'repositories/floor_repository.dart';
 import 'repositories/room_type_repository.dart';
 import 'repositories/guest_repository.dart';
 import 'repositories/guest_card_repository.dart';
+import 'repositories/pocketbase_room_repository.dart';
+import 'repositories/pocketbase_room_type_repository.dart';
+import 'repositories/pocketbase_floor_repository.dart';
+import 'repositories/pocketbase_guest_repository.dart';
+import 'repositories/pocketbase_guest_card_repository.dart';
+import 'repositories/pocketbase_booking_repository.dart';
 import 'state/room_list_notifier.dart';
 import 'state/booking_list_notifier.dart';
 import 'router.dart';
@@ -22,29 +29,34 @@ void main() async {
   await initializeDateFormatting('ru');
   usePathUrlStrategy();
 
-  final prefs = await SharedPreferences.getInstance();
-
   runApp(
     MultiProvider(
       providers: [
-        Provider<RoomRepository>(create: (_) => InMemoryRoomRepository(prefs)),
-        Provider<BookingRepository>(
-          create: (_) => InMemoryBookingRepository(prefs),
-        ),
-        Provider<FloorRepository>(
-          create: (_) => InMemoryFloorRepository(prefs),
-        ),
-        Provider<RoomTypeRepository>(
-          create: (_) => InMemoryRoomTypeRepository(prefs),
-        ),
-        Provider<GuestRepository>(
-          create: (_) => InMemoryGuestRepository(prefs),
-        ),
-        Provider<GuestCardRepository>(
-          create: (_) => InMemoryGuestCardRepository(prefs),
+        Provider<Dio>(create: (_) => buildDio()),
+
+        ProxyProvider<Dio, RoomRepository>(
+          update: (_, dio, _) => PocketBaseRoomRepository(dio),
         ),
 
-        Provider<SharedPreferences>.value(value: prefs),
+        ProxyProvider<Dio, RoomTypeRepository>(
+          update: (_, dio, _) => PocketBaseRoomTypeRepository(dio),
+        ),
+
+        ProxyProvider<Dio, FloorRepository>(
+          update: (_, dio, _) => PocketBaseFloorRepository(dio),
+        ),
+
+        ProxyProvider<Dio, GuestRepository>(
+          update: (_, dio, _) => PocketBaseGuestRepository(dio),
+        ),
+
+        ProxyProvider<Dio, GuestCardRepository>(
+          update: (_, dio, _) => PocketBaseGuestCardRepository(dio),
+        ),
+
+        ProxyProvider<Dio, BookingRepository>(
+          update: (_, dio, _) => PocketBaseBookingRepository(dio),
+        ),
 
         ChangeNotifierProvider(
           create: (context) =>

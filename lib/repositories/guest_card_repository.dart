@@ -5,58 +5,20 @@ import '../models/guest_card.dart';
 
 abstract interface class GuestCardRepository {
   List<GuestCard> getAll({bool includeDeleted = false});
-  GuestCard? getById(int id);
-  GuestCard? getByGuestId(int guestId);
+  GuestCard? getById(String id); // ← String
+  GuestCard? getByGuestId(String guestId); // ← String
   GuestCard create(GuestCard card);
   GuestCard update(GuestCard card);
-  void delete(int id, {bool soft = true});
-  void restore(int id);
+  void delete(String id, {bool soft = true}); // ← String
+  void restore(String id); // ← String
 }
-
-final List<GuestCard> _seedGuestCards = [
-  GuestCard(
-    id: 1,
-    guestId: 1,
-    passportNumber: '4510 123456',
-    passportIssuedBy: 'УФМС России по г. Москве',
-    passportIssuedDate: DateTime(2015, 3, 15),
-  ),
-  GuestCard(
-    id: 2,
-    guestId: 2,
-    passportNumber: '4511 234567',
-    passportIssuedBy: 'УФМС России по г. Санкт-Петербургу',
-    passportIssuedDate: DateTime(2016, 7, 22),
-  ),
-  GuestCard(
-    id: 3,
-    guestId: 3,
-    passportNumber: '4512 345678',
-    passportIssuedBy: 'УФМС России по Московской области',
-    passportIssuedDate: DateTime(2017, 11, 8),
-  ),
-  GuestCard(
-    id: 4,
-    guestId: 4,
-    passportNumber: '4513 456789',
-    passportIssuedBy: 'УФМС России по г. Казани',
-    passportIssuedDate: DateTime(2018, 5, 19),
-  ),
-  GuestCard(
-    id: 5,
-    guestId: 5,
-    passportNumber: '4514 567890',
-    passportIssuedBy: 'УФМС России по г. Екатеринбургу',
-    passportIssuedDate: DateTime(2019, 9, 30),
-  ),
-];
 
 class InMemoryGuestCardRepository implements GuestCardRepository {
   static const _key = 'guest_cards_v1';
   final SharedPreferences? _prefs;
 
   final List<GuestCard> _cards = [];
-  int _nextId = 6;
+  int _nextId = 1;
 
   InMemoryGuestCardRepository([this._prefs]) {
     _restore();
@@ -64,29 +26,19 @@ class InMemoryGuestCardRepository implements GuestCardRepository {
 
   void _restore() {
     if (_prefs == null) {
-      _cards.addAll(_seedGuestCards);
-      return;
+      return; // Не загружаем seed-данные
     }
 
     final raw = _prefs.getString(_key);
-    if (raw == null) {
-      _cards.addAll(_seedGuestCards);
-      _persist();
-      return;
-    }
+    if (raw == null) return;
 
     try {
       final list = jsonDecode(raw) as List;
       _cards.addAll(
         list.map((e) => GuestCard.fromJson(e as Map<String, dynamic>)).toList(),
       );
-
-      if (_cards.isNotEmpty) {
-        _nextId = _cards.map((c) => c.id).reduce((a, b) => a > b ? a : b) + 1;
-      }
     } catch (e) {
-      _cards.addAll(_seedGuestCards);
-      _persist();
+      // Если не удалось загрузить - оставляем пустым
     }
   }
 
@@ -103,7 +55,8 @@ class InMemoryGuestCardRepository implements GuestCardRepository {
   }
 
   @override
-  GuestCard? getById(int id) {
+  GuestCard? getById(String id) {
+    // ← String
     try {
       return _cards.firstWhere((c) => c.id == id && !c.isDeleted);
     } catch (e) {
@@ -112,7 +65,8 @@ class InMemoryGuestCardRepository implements GuestCardRepository {
   }
 
   @override
-  GuestCard? getByGuestId(int guestId) {
+  GuestCard? getByGuestId(String guestId) {
+    // ← String
     try {
       return _cards.firstWhere((c) => c.guestId == guestId && !c.isDeleted);
     } catch (e) {
@@ -123,7 +77,7 @@ class InMemoryGuestCardRepository implements GuestCardRepository {
   @override
   GuestCard create(GuestCard card) {
     final newCard = GuestCard(
-      id: _nextId++,
+      id: 'temp_card_${_nextId++}', // ← String
       guestId: card.guestId,
       passportNumber: card.passportNumber,
       passportIssuedBy: card.passportIssuedBy,
@@ -144,7 +98,8 @@ class InMemoryGuestCardRepository implements GuestCardRepository {
   }
 
   @override
-  void delete(int id, {bool soft = true}) {
+  void delete(String id, {bool soft = true}) {
+    // ← String
     final i = _cards.indexWhere((c) => c.id == id);
     if (i == -1) throw StateError('Карточка $id не найдена');
 
@@ -157,7 +112,8 @@ class InMemoryGuestCardRepository implements GuestCardRepository {
   }
 
   @override
-  void restore(int id) {
+  void restore(String id) {
+    // ← String
     final i = _cards.indexWhere((c) => c.id == id);
     if (i == -1) throw StateError('Карточка $id не найдена');
     _cards[i] = _cards[i].copyWith(clearDeletedAt: true);

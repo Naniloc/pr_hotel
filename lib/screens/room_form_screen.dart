@@ -5,14 +5,18 @@ import 'package:go_router/go_router.dart';
 // ignore_for_file: deprecated_member_use
 
 import '../models/room.dart';
+import '../models/floor.dart';
+import '../models/room_type.dart';
 import '../repositories/room_repository.dart';
 import '../repositories/floor_repository.dart';
 import '../repositories/room_type_repository.dart';
+import '../repositories/pocketbase_floor_repository.dart';
+import '../repositories/pocketbase_room_type_repository.dart';
 import '../core/validators.dart';
 import '../state/room_list_notifier.dart';
 
 class RoomFormScreen extends StatefulWidget {
-  final int? id;
+  final String? id;
 
   const RoomFormScreen({super.key, this.id});
 
@@ -29,10 +33,13 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
   late final TextEditingController _capacityController;
   late final TextEditingController _priceController;
 
-  int? _floorId;
-  int? _roomTypeId;
+  String? _floorId;
+  String? _roomTypeId;
   bool _isAvailable = true;
   bool _isLoading = false;
+
+  List<Floor> _floors = [];
+  List<RoomType> _roomTypes = [];
 
   @override
   void initState() {
@@ -41,8 +48,28 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
     _capacityController = TextEditingController();
     _priceController = TextEditingController();
 
+    _loadFloors();
+    _loadRoomTypes();
+
     if (widget.isEditing) {
       _loadRoom();
+    }
+  }
+
+  Future<void> _loadFloors() async {
+    final repo = context.read<FloorRepository>() as PocketBaseFloorRepository;
+    final floors = await repo.getAllAsync();
+    if (mounted) {
+      setState(() => _floors = floors);
+    }
+  }
+
+  Future<void> _loadRoomTypes() async {
+    final repo =
+        context.read<RoomTypeRepository>() as PocketBaseRoomTypeRepository;
+    final types = await repo.getAllAsync();
+    if (mounted) {
+      setState(() => _roomTypes = types);
     }
   }
 
@@ -78,7 +105,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
     final repo = context.read<RoomRepository>();
 
     final room = Room(
-      id: widget.id ?? 0,
+      id: widget.id ?? '',
       number: _numberController.text.trim(),
       floorId: _floorId!,
       roomTypeId: _roomTypeId!,
@@ -130,12 +157,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
       );
     }
 
-    final floorRepo = context.read<FloorRepository>();
-    final roomTypeRepo = context.read<RoomTypeRepository>();
     final roomRepo = context.read<RoomRepository>();
-
-    final floors = floorRepo.getAll();
-    final roomTypes = roomTypeRepo.getAll();
 
     return Scaffold(
       appBar: AppBar(
@@ -175,13 +197,13 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<String>(
               value: _floorId,
               decoration: const InputDecoration(
                 labelText: 'Этаж',
                 border: OutlineInputBorder(),
               ),
-              items: floors
+              items: _floors
                   .map(
                     (f) => DropdownMenuItem(
                       value: f.id,
@@ -194,13 +216,13 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<String>(
               value: _roomTypeId,
               decoration: const InputDecoration(
                 labelText: 'Тип номера',
                 border: OutlineInputBorder(),
               ),
-              items: roomTypes
+              items: _roomTypes
                   .map(
                     (rt) =>
                         DropdownMenuItem(value: rt.id, child: Text(rt.name)),

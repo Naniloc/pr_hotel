@@ -1,5 +1,5 @@
 class RoomType {
-  final int id;
+  final String id;
   final String name;
   final String description;
   final DateTime? deletedAt;
@@ -37,7 +37,7 @@ class RoomType {
   };
 
   factory RoomType.fromJson(Map<String, dynamic> json) => RoomType(
-    id: json['id'] as int? ?? 0,
+    id: json['id'] as String? ?? '', // ← String
     name: json['name'] as String? ?? '',
     description: json['description'] as String? ?? '',
     deletedAt: json['deletedAt'] == null

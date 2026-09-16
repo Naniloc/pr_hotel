@@ -108,9 +108,14 @@ class FloorsListScreen extends StatelessWidget {
     BuildContext context,
     FloorRepository repo,
     RoomRepository roomRepo,
-    int id,
+    String id,
   ) async {
-    final result = await roomRepo.find(const RoomQuery().copyWith(floor: id));
+    final floor = repo.getById(id);
+    if (floor == null) return;
+
+    final result = await roomRepo.find(
+      const RoomQuery().copyWith(floor: floor.number),
+    );
     final roomCount = result.total;
 
     if (!context.mounted) return;

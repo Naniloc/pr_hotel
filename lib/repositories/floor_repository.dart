@@ -5,27 +5,20 @@ import '../models/floor.dart';
 
 abstract interface class FloorRepository {
   List<Floor> getAll({bool includeDeleted = false});
-  Floor? getById(int id);
+  Floor? getById(String id); // ← String
   Floor create(Floor floor);
   Floor update(Floor floor);
-  void delete(int id, {bool soft = true});
-  void restore(int id);
-  int countRoomsByFloorId(int floorId);
+  void delete(String id, {bool soft = true}); // ← String
+  void restore(String id); // ← String
+  int countRoomsByFloorId(String floorId); // ← String
 }
-
-const List<Floor> _seedFloors = [
-  Floor(id: 1, number: 1, roomCount: 5),
-  Floor(id: 2, number: 2, roomCount: 5),
-  Floor(id: 3, number: 3, roomCount: 5),
-  Floor(id: 4, number: 4, roomCount: 5),
-];
 
 class InMemoryFloorRepository implements FloorRepository {
   static const _key = 'floors_v1';
   final SharedPreferences? _prefs;
 
   final List<Floor> _floors = [];
-  int _nextId = 5;
+  int _nextId = 1;
 
   InMemoryFloorRepository([this._prefs]) {
     _restore();
@@ -33,29 +26,19 @@ class InMemoryFloorRepository implements FloorRepository {
 
   void _restore() {
     if (_prefs == null) {
-      _floors.addAll(_seedFloors);
-      return;
+      return; // Не загружаем seed-данные
     }
 
     final raw = _prefs.getString(_key);
-    if (raw == null) {
-      _floors.addAll(_seedFloors);
-      _persist();
-      return;
-    }
+    if (raw == null) return;
 
     try {
       final list = jsonDecode(raw) as List;
       _floors.addAll(
         list.map((e) => Floor.fromJson(e as Map<String, dynamic>)).toList(),
       );
-
-      if (_floors.isNotEmpty) {
-        _nextId = _floors.map((f) => f.id).reduce((a, b) => a > b ? a : b) + 1;
-      }
     } catch (e) {
-      _floors.addAll(_seedFloors);
-      _persist();
+      // Если не удалось загрузить - оставляем пустым
     }
   }
 
@@ -72,7 +55,8 @@ class InMemoryFloorRepository implements FloorRepository {
   }
 
   @override
-  Floor? getById(int id) {
+  Floor? getById(String id) {
+    // ← String
     try {
       return _floors.firstWhere((f) => f.id == id && !f.isDeleted);
     } catch (e) {
@@ -83,7 +67,7 @@ class InMemoryFloorRepository implements FloorRepository {
   @override
   Floor create(Floor floor) {
     final newFloor = Floor(
-      id: _nextId++,
+      id: 'temp_floor_${_nextId++}', // ← String
       number: floor.number,
       roomCount: floor.roomCount,
     );
@@ -102,7 +86,8 @@ class InMemoryFloorRepository implements FloorRepository {
   }
 
   @override
-  void delete(int id, {bool soft = true}) {
+  void delete(String id, {bool soft = true}) {
+    // ← String
     final i = _floors.indexWhere((f) => f.id == id);
     if (i == -1) throw StateError('Этаж $id не найден');
 
@@ -115,7 +100,8 @@ class InMemoryFloorRepository implements FloorRepository {
   }
 
   @override
-  void restore(int id) {
+  void restore(String id) {
+    // ← String
     final i = _floors.indexWhere((f) => f.id == id);
     if (i == -1) throw StateError('Этаж $id не найден');
     _floors[i] = _floors[i].copyWith(clearDeletedAt: true);
@@ -123,8 +109,9 @@ class InMemoryFloorRepository implements FloorRepository {
   }
 
   @override
-  int countRoomsByFloorId(int floorId) {
-    // Пока заглушка - реализуем после добавления инжекции RoomRepository
+  int countRoomsByFloorId(String floorId) {
+    // ← String
+    // Заглушка - реализуем при интеграции
     return 0;
   }
 }

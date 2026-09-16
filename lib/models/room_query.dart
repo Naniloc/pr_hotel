@@ -1,6 +1,6 @@
 class RoomQuery {
   final String search;
-  final int? roomTypeId;
+  final String? roomTypeId;
   final int? floor;
   final int? priceMin;
   final int? priceMax;
@@ -43,7 +43,9 @@ class RoomQuery {
   }) {
     return RoomQuery(
       search: search ?? this.search,
-      roomTypeId: roomTypeId == _unset ? this.roomTypeId : roomTypeId as int?,
+      roomTypeId: roomTypeId == _unset
+          ? this.roomTypeId
+          : roomTypeId as String?, // ← String?
       floor: floor == _unset ? this.floor : floor as int?,
       priceMin: priceMin == _unset ? this.priceMin : priceMin as int?,
       priceMax: priceMax == _unset ? this.priceMax : priceMax as int?,

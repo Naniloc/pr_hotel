@@ -1,6 +1,6 @@
 class GuestCard {
-  final int id;
-  final int guestId;
+  final String id;
+  final String guestId;
   final String passportNumber;
   final String passportIssuedBy;
   final DateTime passportIssuedDate;
@@ -18,7 +18,7 @@ class GuestCard {
   bool get isDeleted => deletedAt != null;
 
   GuestCard copyWith({
-    int? guestId,
+    String? guestId, // ← String
     String? passportNumber,
     String? passportIssuedBy,
     DateTime? passportIssuedDate,
@@ -47,8 +47,8 @@ class GuestCard {
   };
 
   factory GuestCard.fromJson(Map<String, dynamic> json) => GuestCard(
-    id: json['id'] as int? ?? 0,
-    guestId: json['guestId'] as int? ?? 0,
+    id: json['id'] as String? ?? '', // ← String
+    guestId: json['guestId'] as String? ?? '', // ← String
     passportNumber: json['passportNumber'] as String? ?? '',
     passportIssuedBy: json['passportIssuedBy'] as String? ?? '',
     passportIssuedDate: json['passportIssuedDate'] == null

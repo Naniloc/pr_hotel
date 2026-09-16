@@ -1,5 +1,5 @@
 class Guest {
-  final int id;
+  final String id; // ← String
   final String name;
   final String email;
   final String phone;
@@ -42,7 +42,7 @@ class Guest {
   };
 
   factory Guest.fromJson(Map<String, dynamic> json) => Guest(
-    id: json['id'] as int? ?? 0,
+    id: json['id'] as String? ?? '', // ← String
     name: json['name'] as String? ?? '',
     email: json['email'] as String? ?? '',
     phone: json['phone'] as String? ?? '',

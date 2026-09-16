@@ -1,8 +1,13 @@
+import 'room.dart';
+import 'guest.dart';
+
 class Booking {
-  final int id;
-  final int roomId;
-  final int guestId;
+  final String id;
+  final String roomId;
+  final String guestId;
   final String guestName;
+  final Room? room;
+  final Guest? guest;
   final DateTime checkIn;
   final DateTime checkOut;
   final String status;
@@ -15,6 +20,8 @@ class Booking {
     required this.guestName,
     required this.checkIn,
     required this.checkOut,
+    this.room,
+    this.guest,
     this.status = 'confirmed',
     this.deletedAt,
   });
@@ -24,9 +31,11 @@ class Booking {
   int get nights => checkOut.difference(checkIn).inDays;
 
   Booking copyWith({
-    int? roomId,
-    int? guestId,
+    String? roomId,
+    String? guestId,
     String? guestName,
+    Room? room,
+    Guest? guest,
     DateTime? checkIn,
     DateTime? checkOut,
     String? status,
@@ -38,6 +47,8 @@ class Booking {
       roomId: roomId ?? this.roomId,
       guestId: guestId ?? this.guestId,
       guestName: guestName ?? this.guestName,
+      room: room ?? this.room,
+      guest: guest ?? this.guest,
       checkIn: checkIn ?? this.checkIn,
       checkOut: checkOut ?? this.checkOut,
       status: status ?? this.status,
@@ -65,11 +76,29 @@ class Booking {
       return DateTime(dt.year, dt.month, dt.day);
     }
 
+    final expandData = json['expand'] as Map<String, dynamic>?;
+    Room? room;
+    Guest? guest;
+
+    if (expandData != null) {
+      final roomData = expandData['roomId'];
+      final guestData = expandData['guestId'];
+
+      if (roomData is Map<String, dynamic>) {
+        room = Room.fromJson(roomData);
+      }
+      if (guestData is Map<String, dynamic>) {
+        guest = Guest.fromJson(guestData);
+      }
+    }
+
     return Booking(
-      id: json['id'] as int? ?? 0,
-      roomId: json['roomId'] as int? ?? 0,
-      guestId: json['guestId'] as int? ?? 0,
+      id: json['id'] as String? ?? '',
+      roomId: json['roomId'] as String? ?? '',
+      guestId: json['guestId'] as String? ?? '',
       guestName: json['guestName'] as String? ?? '',
+      room: room,
+      guest: guest,
       checkIn: normalizeDate(json['checkIn'] as String?, DateTime.now()),
       checkOut: normalizeDate(
         json['checkOut'] as String?,
